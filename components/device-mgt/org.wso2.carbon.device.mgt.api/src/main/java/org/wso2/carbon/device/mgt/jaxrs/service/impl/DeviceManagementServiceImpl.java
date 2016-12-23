@@ -21,7 +21,13 @@ package org.wso2.carbon.device.mgt.jaxrs.service.impl;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.context.CarbonContext;
-import org.wso2.carbon.device.mgt.common.*;
+import org.wso2.carbon.device.mgt.common.Device;
+import org.wso2.carbon.device.mgt.common.DeviceIdentifier;
+import org.wso2.carbon.device.mgt.common.DeviceManagementException;
+import org.wso2.carbon.device.mgt.common.Feature;
+import org.wso2.carbon.device.mgt.common.FeatureManager;
+import org.wso2.carbon.device.mgt.common.PaginationRequest;
+import org.wso2.carbon.device.mgt.common.PaginationResult;
 import org.wso2.carbon.device.mgt.common.app.mgt.Application;
 import org.wso2.carbon.device.mgt.common.app.mgt.ApplicationManagementException;
 import org.wso2.carbon.device.mgt.common.authorization.DeviceAccessAuthorizationException;
@@ -47,7 +53,16 @@ import org.wso2.carbon.policy.mgt.common.monitor.PolicyComplianceException;
 import org.wso2.carbon.policy.mgt.core.PolicyManagerService;
 
 import javax.validation.constraints.Size;
-import javax.ws.rs.*;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.text.ParseException;
@@ -231,6 +246,51 @@ public class DeviceManagementServiceImpl implements DeviceManagementService {
             String msg = "Error occurred while deleting device(s)";
             log.error(msg, e);
             return Response.serverError().entity(new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+        }
+    }
+
+    @PUT
+    @Override
+    @Path("/type/{device-type}/id/{device-id}")
+    public Response updateDevice(@PathParam("device-type") String type, @PathParam("device-id") String id,
+                                 Device device) {
+        if (device == null) {
+            return Response.status(Response.Status.BAD_REQUEST).build();
+        }
+        try {
+            String currentUser = CarbonContext.getThreadLocalCarbonContext().getUsername();
+            RequestValidationUtil.validateDeviceIdentifier(type, id);
+            DeviceManagementProviderService dms = DeviceMgtAPIUtils.getDeviceManagementService();
+            DeviceAccessAuthorizationService deviceAccessAuthorizationService =
+                    DeviceMgtAPIUtils.getDeviceAccessAuthorizationService();
+
+            // this is the user who initiates the request
+            DeviceIdentifier deviceIdentifier = new DeviceIdentifier(id, type);
+            // check whether the user is authorized
+            if (!deviceAccessAuthorizationService.isUserAuthorized(deviceIdentifier, currentUser)) {
+                String msg = "User '" + currentUser + "' is not authorized to update the given device id '" + id;
+                log.error(msg);
+                return Response.status(Response.Status.UNAUTHORIZED).entity(
+                        new ErrorResponse.ErrorResponseBuilder().setCode(401l).setMessage(msg).build()).build();
+            }
+            if (!dms.isEnrolled(new DeviceIdentifier(id, type), currentUser)) {
+                return Response.status(404).entity(
+                        new ErrorResponse.ErrorResponseBuilder().setMessage("No device exists with the type: '" +
+                                                                                    type + "' and id: '" + id + "'")
+                                .build()).build();
+            }
+            device.setDeviceIdentifier(id);
+            dms.modifyEnrollment(device);
+            return Response.status(Response.Status.OK).build();
+        } catch (DeviceAccessAuthorizationException e) {
+            String msg = "Error occurred while checking the device authorization.";
+            log.error(msg, e);
+            return Response.serverError().entity(
+                    new ErrorResponse.ErrorResponseBuilder().setMessage(msg).build()).build();
+        } catch (DeviceManagementException e) {
+            String msg = "Error occurred while updating device.";
+            log.error(msg, e);
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(msg).build();
         }
     }
 

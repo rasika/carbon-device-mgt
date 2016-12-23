@@ -41,6 +41,7 @@ import org.wso2.carbon.device.mgt.jaxrs.beans.ErrorResponse;
 import org.wso2.carbon.policy.mgt.common.Policy;
 import org.wso2.carbon.policy.mgt.common.monitor.ComplianceData;
 
+import javax.validation.Valid;
 import javax.validation.constraints.Size;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
@@ -347,6 +348,82 @@ public interface DeviceManagementService {
             @Size(max = 45)
             String deviceId);
 
+    //device update request would looks like follows
+    //PUT devices/type/virtual_firealarm/id/us06ww93auzp
+    @PUT
+    @Path("/type/{device-type}/id/{device-id}")
+    @ApiOperation(
+            produces = MediaType.APPLICATION_JSON,
+            httpMethod = "PUT",
+            value = "Update the device specified by device id",
+            notes =  "If you wish to make changes to an existing device, that can be done by updating the device using " +
+                    "this resource.",
+            tags = "Device Management",
+            authorizations = {
+                    @Authorization(
+                            value="permission",
+                            scopes = { @AuthorizationScope(scope = "/device-mgt/devices/owning-device/update",
+                                                           description = "Update Device") }
+                    )
+            }
+    )
+    @ApiResponses(
+            value = {
+                    @ApiResponse(
+                            code = 200,
+                            message = "OK. \n Successfully updated information of the device.",
+                            response = Device.class,
+                            responseHeaders = {
+                                    @ResponseHeader(
+                                            name = "Content-Type",
+                                            description = "The content type of the body"),
+                                    @ResponseHeader(
+                                            name = "ETag",
+                                            description = "Entity Tag of the response resource.\n" +
+                                                    "Used by caches, or in conditional requests."),
+                                    @ResponseHeader(
+                                            name = "Last-Modified",
+                                            description = "Date and time the resource has been modified the last time.\n" +
+                                                    "Used by caches, or in conditional requests."),
+                            }),
+                    @ApiResponse(
+                            code = 304,
+                            message = "Not Modified. Empty body because the client already has the latest " +
+                                    "version of the requested resource."),
+                    @ApiResponse(
+                            code = 400,
+                            message = "Bad Request. \n Invalid request or validation error.",
+                            response = ErrorResponse.class),
+                    @ApiResponse(
+                            code = 404,
+                            message = "Not Found. \n No device is found under the provided type and id.",
+                            response = ErrorResponse.class),
+                    @ApiResponse(
+                            code = 500,
+                            message = "Internal Server Error. \n " +
+                                    "Server error occurred while retrieving information requested device.",
+                            response = ErrorResponse.class)
+            })
+    Response updateDevice(
+            @ApiParam(
+                    name = "device-type",
+                    value = "The device type, such as ios, android or windows.",
+                    required = true)
+            @PathParam("device-type")
+            @Size(max = 45)
+                    String deviceType,
+            @ApiParam(
+                    name = "device-id",
+                    value = "The device identifier of the device.",
+                    required = true)
+            @PathParam("device-id")
+            @Size(max = 45)
+                    String deviceId,
+            @ApiParam(
+                    name = "device",
+                    value = "Device object with data.",
+                    required = true)
+            @Valid Device device);
 
     @GET
     @Path("/{type}/{id}/features")
